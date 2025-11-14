@@ -1,15 +1,16 @@
 {
   "expo": {
-    "name": "EqualsOSWeb",
-    "slug": "EqualsOSWeb",
+    "name": "Equals OS [Web]",
+    "slug": "equals-os-web",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "equalsosweb",
+    "scheme": "equals-os-web",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.equalsos.web"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,6 +19,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "package": "com.equalsos.web",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
