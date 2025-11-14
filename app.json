@@ -3,7 +3,7 @@
     "name": "Equals OS [Web]",
     "slug": "equals-os-web",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "equals-os-web",
     "userInterfaceStyle": "automatic",
@@ -21,7 +21,8 @@
       },
       "package": "com.equalsos.web",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "configChanges": "keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
     },
     "web": {
       "output": "static",
