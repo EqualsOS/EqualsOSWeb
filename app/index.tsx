@@ -19,8 +19,25 @@ import type {
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 
-const MY_WEBSITE_URL = 'https://equalsos.com';
+// IMPORTANT: Replace these with your actual OAuth client IDs
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_WEB_CLIENT_ID_HERE';
+const IOS_CLIENT_ID = 'YOUR_IOS_STANDALONE_CLIENT_ID';
+const ANDROID_CLIENT_ID = 'YOUR_ANDROID_STANDALONE_CLIENT_ID';
+// The custom scheme is required for the native redirect
+const REDIRECT_URI = makeRedirectUri({
+  native: 'com.equalsos.web://redirect', // Ensure this matches your package name and scheme
+  //useProxy: true, // Use Expo's proxy for Expo Go/Development build
+});
+
+// Immediately dismiss any residual auth sessions
+WebBrowser.maybeCompleteAuthSession();
+
+// UPDATED: Point this to your new welcome page, or just the root.
+const MY_WEBSITE_URL = 'https://equalsos.com/';
 const APP_BACKGROUND_COLOR = '#1D3D47'; // Default color
 
 // --- Helper (Unchanged) ---
@@ -103,7 +120,58 @@ export default function Index() {
   const webViewRef = useRef<WebViewType>(null);
   const [themeColor, setThemeColor] = useState(APP_BACKGROUND_COLOR);
 
-  // --- This effect now runs when themeColor changes ---
+  // --- NEW: Native Google Sign-In Hook ---
+  // This hook sets up the native request logic
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    androidClientId: ANDROID_CLIENT_ID,
+    iosClientId: IOS_CLIENT_ID,
+    webClientId: GOOGLE_CLIENT_ID,
+    redirectUri: REDIRECT_URI,
+    scopes: ['openid', 'profile', 'email'],
+  });
+
+  // Function to call the native OAuth flow
+  const handleNativeGoogleSignIn = async () => {
+    if (!request) {
+      console.warn('Google Auth request not yet initialized.');
+      return;
+    }
+    await promptAsync();
+  };
+
+  // --- Effect to handle the result of the native sign-in attempt ---
+  useEffect(() => {
+    if (response?.type === 'success' && webViewRef.current) {
+      const { authentication } = response;
+
+      // Get the ID Token (this is what your server needs for verification)
+      const idToken = authentication?.idToken;
+
+      if (idToken) {
+        // Send the token back to the website's JavaScript environment
+        const js = `
+          // Website must listen for this global function
+          if (window.handleNativeAuthToken) {
+            window.handleNativeAuthToken('${idToken}');
+          } else {
+            console.error("Website JS function window.handleNativeAuthToken not found.");
+          }
+          true;
+        `;
+        webViewRef.current.injectJavaScript(js);
+      } else {
+        console.error('Failed to retrieve ID Token during native sign-in.');
+      }
+    } else if (response?.type === 'error' || response?.type === 'cancel') {
+      // Handle cancel or error by sending a message back to the website if needed
+      const errorType = response.type === 'cancel' ? 'Cancelled' : 'Error';
+      const js = `console.log('Native Google Sign-In was ${errorType}.'); true;`;
+      webViewRef.current?.injectJavaScript(js);
+    }
+  }, [response]);
+
+
+  // --- This effect now runs when themeColor changes (Unchanged) ---
   useLayoutEffect(() => {
     if (Platform.OS === 'android') {
       // Use the only available function to set the bottom nav bar color
@@ -135,22 +203,47 @@ export default function Index() {
     }
   };
 
+  // --- UPDATED: handleNavigation (Unchanged) ---
   const handleNavigation = (event: ShouldStartLoadRequest) => {
     const { url } = event;
+    const isMyWebsite = url.startsWith(MY_WEBSITE_URL);
 
-    if (url.startsWith(MY_WEBSITE_URL) || url === 'about:blank') {
+    // Check for Google Auth domains (This is still needed for internal WebViews, but the main flow bypasses it)
+    const isGoogleAuth =
+      url.includes('accounts.google.com') ||
+      url.includes('accounts.youtube.com');
+
+    // Allow navigation if it's our site, a Google auth page, or blank
+    if (isMyWebsite || isGoogleAuth || url === 'about:blank') {
       return true;
     }
 
+    // It's an external link. Open in default browser & stop WebView.
     Linking.openURL(url);
     return false;
   };
 
-  // --- Handle messages from the WebView (Unchanged) ---
+  // --- UPDATED: Handle messages from the WebView (New Logic) ---
   const handleMessage = (event: WebViewMessageEvent) => {
-    const newColor = event.nativeEvent.data;
-    if (newColor && newColor.startsWith('#')) {
-      setThemeColor(newColor);
+    const messageData = event.nativeEvent.data;
+
+    try {
+      // Check for the theme color (non-JSON string)
+      if (messageData && messageData.startsWith('#')) {
+        setThemeColor(messageData);
+        return;
+      }
+
+      // Check for JSON commands
+      const data = JSON.parse(messageData);
+
+      if (data.type === 'SIGN_IN_GOOGLE') {
+        handleNativeGoogleSignIn();
+      }
+
+    } catch (e) {
+      // Ignore non-JSON messages (other than the theme color string)
+      console.warn('Received unhandled message or bad JSON:', messageData);
     }
   };
 
@@ -181,10 +274,10 @@ export default function Index() {
           onError={() => {
             setHasError(true);
           }}
-          // --- Props for theme bridging ---
+          // --- Props for theme bridging & native commands ---
           injectedJavaScript={injectedJavaScript}
           onMessage={handleMessage}
-          // --- NEW PROP ---
+          // ---
           allowsFullscreenVideo={true}
         />
 

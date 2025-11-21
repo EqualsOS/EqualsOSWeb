@@ -18,9 +18,7 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "package": "com.equalsos.web",
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "configChanges": "keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "output": "static",
@@ -39,11 +37,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2b78aa7e-d8ee-463d-a539-085f3264cdf9"
+      }
     }
   }
 }
